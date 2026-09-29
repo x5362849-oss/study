@@ -1,0 +1,56 @@
+name: Daily Literature
+
+on:
+  schedule:
+    - cron: '0 0 * * *'   # UTC 0点 = 北京时间早上 8:00 自动运行
+  workflow_dispatch:       # 允许在 Actions 页面手动运行
+
+jobs:
+  daily-literature:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 生成文学日报并推送
+        env:
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          SENDKEY: ${{ secrets.SENDKEY }}
+        run: |
+          python3 - <<'EOF'
+          import os, json, urllib.request, urllib.parse
+          from datetime import date
+
+          glm_key = os.environ["LLM_API_KEY"]
+          sendkey = os.environ["SENDKEY"]
+
+          # 1. 调用 GLM-4-Flash 生成日报
+          req = urllib.request.Request(
+              "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+              data=json.dumps({
+                  "model": "glm-4-flash",
+                  "messages": [
+                      {"role": "system", "content": "你是一位靠谱的文学编辑。"},
+                      {"role": "user", "content": "请生成今日文学日报，内容包括：一条文学资讯、一首诗推荐（附一句推荐理由）、一段经典摘抄（注明出处）、一句文学金句。使用简洁美观的中文 Markdown 格式。"}
+                  ],
+                  "temperature": 0.8
+              }).encode(),
+              headers={"Content-Type": "application/json",
+                       "Authorization": "Bearer " + glm_key})
+          with urllib.request.urlopen(req, timeout=60) as r:
+              resp = json.loads(r.read().decode())
+          content = resp["choices"][0]["message"]["content"]
+          print(content)
+
+          # 2. 通过 Server酱 推送到微信
+          data = urllib.parse.urlencode({
+              "title": "📚 文学日报 " + date.today().strftime("%Y-%m-%d"),
+              "desp": content
+          }).encode()
+          req2 = urllib.request.Request(
+              "https://sctapi.ftqq.com/" + sendkey + ".send", data=data)
+          with urllib.request.urlopen(req2, timeout=30) as r:
+              result = json.loads(r.read().decode())
+          if result.get("code") == 0:
+              print("推送成功")
+          else:
+              raise SystemExit("推送失败：" + str(result))
+          EOF
+
