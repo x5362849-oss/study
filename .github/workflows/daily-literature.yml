@@ -1,56 +1,116 @@
-name: Daily Literature
+    name: Daily Astro Papers
 
 on:
   schedule:
-    - cron: '0 0 * * *'   # UTC 0点 = 北京时间早上 8:00 自动运行
-  workflow_dispatch:       # 允许在 Actions 页面手动运行
+    - cron: '30 23 * * *'   # UTC 23:30 = 北京时间每天早上 07:30
+  workflow_dispatch:
 
 jobs:
-  daily-literature:
+  daily-paper:
     runs-on: ubuntu-latest
     steps:
-      - name: 生成文学日报并推送
+      - name: 拉取arXiv新论文并总结推送
         env:
-          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-          SENDKEY: ${{ secrets.SENDKEY }}
+          ZHIPU_API_KEY: ${{ secrets.ZHIPU_API_KEY }}
+          SERVERCHAN_SENDKEY: ${{ secrets.SERVERCHAN_SENDKEY }}
         run: |
-          python3 - <<'EOF'
-          import os, json, urllib.request, urllib.parse
-          from datetime import date
+          python3 << 'PYEOF'
+          import os, re, datetime
+          import requests
+          import xml.etree.ElementTree as ET
 
-          glm_key = os.environ["LLM_API_KEY"]
-          sendkey = os.environ["SENDKEY"]
+          LLM_API_KEY = os.environ.get('ZHIPU_API_KEY', '')
+          SENDKEY = os.environ.get('SERVERCHAN_SENDKEY', '')
+          if not LLM_API_KEY or not SENDKEY:
+              raise SystemExit('缺少 secrets：请检查文件里两个 secret 名字是否与仓库 Settings 中的名字一致')
 
-          # 1. 调用 GLM-4-Flash 生成日报
-          req = urllib.request.Request(
-              "https://open.bigmodel.cn/api/paas/v4/chat/completions",
-              data=json.dumps({
-                  "model": "glm-4-flash",
-                  "messages": [
-                      {"role": "system", "content": "你是一位靠谱的文学编辑。"},
-                      {"role": "user", "content": "请生成今日文学日报，内容包括：一条文学资讯、一首诗推荐（附一句推荐理由）、一段经典摘抄（注明出处）、一句文学金句。使用简洁美观的中文 Markdown 格式。"}
-                  ],
-                  "temperature": 0.8
-              }).encode(),
-              headers={"Content-Type": "application/json",
-                       "Authorization": "Bearer " + glm_key})
-          with urllib.request.urlopen(req, timeout=60) as r:
-              resp = json.loads(r.read().decode())
-          content = resp["choices"][0]["message"]["content"]
-          print(content)
+          # ====== 想追踪的关键词，直接在下面增删即可 ======
+          KEYWORDS = ['HERD', 'transition radiation detector', 'Polar-2', 'eXTP',
+                      'gas pixel detector', 'X-ray polarimetry', 'X-ray polarimeter',
+                      'LHAASO', 'LACT', 'SiPM', 'silicon photomultiplier', 'calorimeter']
+          # ===============================================
 
-          # 2. 通过 Server酱 推送到微信
-          data = urllib.parse.urlencode({
-              "title": "📚 文学日报 " + date.today().strftime("%Y-%m-%d"),
-              "desp": content
-          }).encode()
-          req2 = urllib.request.Request(
-              "https://sctapi.ftqq.com/" + sendkey + ".send", data=data)
-          with urllib.request.urlopen(req2, timeout=30) as r:
-              result = json.loads(r.read().decode())
-          if result.get("code") == 0:
-              print("推送成功")
+          PATTERN = re.compile('|'.join(r'\b' + re.escape(k) + r'\b' for k in KEYWORDS), re.I)
+          QUERY = ('(all:"HERD" OR all:"Polar-2" OR all:"eXTP" OR all:"gas pixel detector" '
+                   'OR all:"X-ray polarimetry" OR all:"transition radiation detector" '
+                   'OR all:"LHAASO" OR all:"SiPM" OR all:"calorimeter")')
+
+          print('正在从 arXiv 拉取论文...')
+          resp = requests.get('https://export.arxiv.org/api/query', params={
+              'search_query': QUERY, 'sortBy': 'submittedDate',
+              'sortOrder': 'descending', 'max_results': '60'}, timeout=60)
+          resp.raise_for_status()
+
+          ns = {'a': 'http://www.w3.org/2005/Atom'}
+          root = ET.fromstring(resp.content)
+          cutoff = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=5)
+          recent, older = [], []
+          for e in root.findall('a:entry', ns):
+              title = re.sub(r'\s+', ' ', e.findtext('a:title', '', ns)).strip()
+              abstract = re.sub(r'\s+', ' ', e.findtext('a:summary', '', ns)).strip()
+              link = e.findtext('a:id', '', ns).strip()
+              pub = datetime.datetime.fromisoformat(e.findtext('a:published', '', ns).replace('Z', '+00:00'))
+              authors = [x.findtext('a:name', '', ns) for x in e.findall('a:author', ns)]
+              if not PATTERN.search(title + ' ' + abstract):
+                  continue
+              paper = {'title': title, 'abstract': abstract, 'link': link, 'pub': pub, 'authors': authors}
+              (recent if pub >= cutoff else older).append(paper)
+
+          today = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d')
+          if recent:
+              papers, note = recent[:5], ''
+          elif older:
+              papers, note = older[:2], '（近5天无完全匹配的新论文，以下是最近的相关论文回顾）'
           else:
-              raise SystemExit("推送失败：" + str(result))
-          EOF
+              papers, note = [], ''
+          print('筛选出 %d 篇论文' % len(papers))
 
+          SYSTEM_PROMPT = ('你是一位天体物理探测器方向的资深导师，负责帮学生预读文献。'
+                           '回答只基于给定的标题和摘要，不要编造摘要中不存在的实验细节或数字。')
+
+          def ask_llm(title, abstract):
+              user_prompt = (
+                  '请基于下面这篇论文的标题和摘要，用中文严格按以下格式输出：\n'
+                  '【研究问题】1-2句话\n'
+                  '【核心方法】2-3句话\n'
+                  '【创新点】1-3条，每条一行\n'
+                  '【难点与局限】1-3条，每条一行\n'
+                  '【导师提问】像导师提问学生那样，提出2-3个针对这篇论文的具体问题，'
+                  '问题要指向方法细节、数据可靠性、系统误差或可能的改进方向，'
+                  '让学生带着问题去精读原文，不要泛泛而谈。\n\n'
+                  '标题：' + title + '\n摘要：' + abstract)
+              r = requests.post('https://open.bigmodel.cn/api/paas/v4/chat/completions',
+                  headers={'Authorization': 'Bearer ' + ZHIPU_KEY},
+                  json={'model': 'glm-4-flash',
+                        'messages': [{'role': 'system', 'content': SYSTEM_PROMPT},
+                                     {'role': 'user', 'content': user_prompt}],
+                        'temperature': 0.4}, timeout=180)
+              r.raise_for_status()
+              return r.json()['choices'][0]['message']['content']
+
+          if papers:
+              desp = '# 🛰️ 天体物理文献日报 ' + today + '\n\n共 ' + str(len(papers)) + ' 篇 ' + note + '\n'
+              for i, p in enumerate(papers, 1):
+                  print('总结中:', p['title'][:60])
+                  author_str = ', '.join(p['authors'][:5]) + (' 等' if len(p['authors']) > 5 else '')
+                  desp += '\n---\n\n## ' + str(i) + '. ' + p['title'] + '\n\n'
+                  desp += '发表：' + p['pub'].strftime('%Y-%m-%d') + '　|　[arXiv 原文](' + p['link'] + ')\n\n'
+                  desp += '作者：' + author_str + '\n\n'
+                  try:
+                      desp += ask_llm(p['title'], p['abstract']) + '\n'
+                  except Exception as err:
+                      desp += '（本篇总结生成失败：' + str(err) + '）\n'
+                  desp += '\n'
+              push_title = '🔭 文献日报：' + str(len(papers)) + ' 篇新论文 ' + today
+          else:
+              desp = '# 🛰️ 天体物理文献日报 ' + today + '\n\n近5天没有发现与你关键词相关的新论文，明天再看看。'
+              push_title = '🔭 文献日报：今日无新论文 ' + today
+
+          print('正在推送到 Server酱...')
+          resp = requests.post('https://sctapi.ftqq.com/' + SC_KEY + '.send',
+                               data={'title': push_title, 'desp': desp}, timeout=60)
+          resp.raise_for_status()
+          print('推送成功')
+          PYEOF
+
+    
