@@ -11,8 +11,8 @@ jobs:
     steps:
       - name: 拉取arXiv新论文并总结推送
         env:
-          ZHIPU_API_KEY: ${{ secrets.ZHIPU_API_KEY }}
-          SERVERCHAN_SENDKEY: ${{ secrets.SERVERCHAN_SENDKEY }}
+          ZHIPU_API_KEY: ${{ secrets.LLM_API_KEY }}
+          SERVERCHAN_SENDKEY: ${{ secrets.SENDKEY }}
         run: |
           python3 << 'PYEOF'
           import os, re, datetime
