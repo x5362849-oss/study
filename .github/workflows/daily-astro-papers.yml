@@ -11,17 +11,17 @@ jobs:
     steps:
       - name: 拉取arXiv新论文并总结推送
         env:
-          ZHIPU_API_KEY: ${{ secrets.LLM_API_KEY }}
-          SERVERCHAN_SENDKEY: ${{ secrets.SENDKEY }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          SENDKEY: ${{ secrets.SENDKEY }}
         run: |
           python3 << 'PYEOF'
           import os, re, datetime
           import requests
           import xml.etree.ElementTree as ET
 
-          ZHIPU_API_KEY = os.environ.get('ZHIPU_API_KEY', '')
-          SC_KEY = os.environ.get('SERVERCHAN_SENDKEY', '')
-          if not  ZHIPU_API_KEY or not SC_KEY:
+          glm_key = os.environ["LLM_API_KEY"]
+          sendkey = os.environ["SENDKEY"]
+          if not  LLM_API_KEY or not SENDKEY:
               raise SystemExit('缺少 secrets：请检查文件里两个 secret 名字是否与仓库 Settings 中的名字一致')
 
           # ====== 想追踪的关键词，直接在下面增删即可 ======
