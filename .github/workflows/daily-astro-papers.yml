@@ -107,7 +107,7 @@ jobs:
               push_title = '🔭 文献日报：今日无新论文 ' + today
 
           print('正在推送到 Server酱...')
-          resp = requests.post('https://sctapi.ftqq.com/' + SC_KEY + '.send',
+          resp = requests.post('https://sctapi.ftqq.com/' + SENDKEY + '.send',
                                data={'title': push_title, 'desp': desp}, timeout=60)
           resp.raise_for_status()
           print('推送成功')
