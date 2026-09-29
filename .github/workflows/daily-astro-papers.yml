@@ -80,7 +80,7 @@ jobs:
                   '让学生带着问题去精读原文，不要泛泛而谈。\n\n'
                   '标题：' + title + '\n摘要：' + abstract)
               r = requests.post('https://open.bigmodel.cn/api/paas/v4/chat/completions',
-                  headers={'Authorization': 'Bearer ' + ZHIPU_KEY},
+                  headers={'Authorization': 'Bearer ' + LLM_API_KEY},
                   json={'model': 'glm-4-flash',
                         'messages': [{'role': 'system', 'content': SYSTEM_PROMPT},
                                      {'role': 'user', 'content': user_prompt}],
