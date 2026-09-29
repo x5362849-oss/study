@@ -19,8 +19,8 @@ jobs:
           import requests
           import xml.etree.ElementTree as ET
 
-          glm_key = os.environ["LLM_API_KEY"]
-          sendkey = os.environ["SENDKEY"]
+          LLM_API_KEY = os.environ.get('LLM_API_KEY', '')
+          SENDKEY = os.environ.get('SENDKEY', '')
           if not  LLM_API_KEY or not SENDKEY:
               raise SystemExit('缺少 secrets：请检查文件里两个 secret 名字是否与仓库 Settings 中的名字一致')
 
