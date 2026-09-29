@@ -19,9 +19,9 @@ jobs:
           import requests
           import xml.etree.ElementTree as ET
 
-          LLM_API_KEY = os.environ.get('ZHIPU_API_KEY', '')
-          SENDKEY = os.environ.get('SERVERCHAN_SENDKEY', '')
-          if not LLM_API_KEY or not SENDKEY:
+          ZHIPU_API_KEY = os.environ.get('ZHIPU_API_KEY', '')
+          SERVERCHAN_SENDKEY = os.environ.get('SERVERCHAN_SENDKEY', '')
+          if not  ZHIPU_API_KEY or not SERVERCHAN_SENDKEY:
               raise SystemExit('缺少 secrets：请检查文件里两个 secret 名字是否与仓库 Settings 中的名字一致')
 
           # ====== 想追踪的关键词，直接在下面增删即可 ======
