@@ -1,4 +1,4 @@
-    name: Daily Astro Papers
+name: Daily Astro Papers
 
 on:
   schedule:
