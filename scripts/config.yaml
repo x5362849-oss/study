@@ -1,0 +1,42 @@
+# 文献推送配置 — 按需增删关键词即可
+arxiv_categories:
+  - astro-ph.HE    # 高能天体物理现象
+  - astro-ph.IM    # 天文仪器方法
+days_back: 3       # 每次回看几天的论文 (周末不发的话建议设 2-3)
+max_fetch: 200     # 每次 API 最多拉取条数
+top_n: 3           # 每天最多精读推送几篇
+temperature: 0.4
+
+topics:
+  - name: HERD-TRD
+    keywords:
+      - HERD
+      - transition radiation detector
+      - transition radiation
+      - cosmic ray direct measurement
+      - space station detector
+  - name: Polar-2
+    keywords:
+      - POLAR-2
+      - gamma-ray burst polarimetry
+      - gamma-ray burst polarization
+      - GRB polarization
+      - scintillator SiPM
+      - gamma-ray polarimeter
+  - name: eXTP-GPD
+    keywords:
+      - eXTP
+      - gas pixel detector
+      - photoelectric polarimetry
+      - X-ray polarimetry
+      - IXPE
+      - X-ray polarization
+  - name: LACT-SiPM
+    keywords:
+      - LACT
+      - LHAASO
+      - SiPM
+      - silicon photomultiplier
+      - imaging atmospheric Cherenkov telescope
+      - Cherenkov telescope camera
+      - CTA
