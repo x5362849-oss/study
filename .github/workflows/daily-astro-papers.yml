@@ -2,7 +2,7 @@ name: Daily Astro Papers
 
 on:
   schedule:
-    - cron: '0 0 * * *'   # UTC 0点 = 北京时间早上 8:00 自动运行
+    - cron: '23 21 * * *'   # UTC 0点 = 北京时间早上 8:00 自动运行
   workflow_dispatch:
 
 jobs:
@@ -17,6 +17,7 @@ jobs:
           python3 << 'PYEOF'
           import os, re, datetime
           import requests
+          import time
           import xml.etree.ElementTree as ET
 
           LLM_API_KEY = os.environ.get('LLM_API_KEY', '')
@@ -35,11 +36,18 @@ jobs:
                    'OR all:"X-ray polarimetry" OR all:"transition radiation detector" '
                    'OR all:"LHAASO" OR all:"SiPM" OR all:"calorimeter")')
 
-          print('正在从 arXiv 拉取论文...')
-          resp = requests.get('https://export.arxiv.org/api/query', params={
-              'search_query': QUERY, 'sortBy': 'submittedDate',
-              'sortOrder': 'descending', 'max_results': '60'}, timeout=60)
-          resp.raise_for_status()
+          for attempt in range(6):
+              resp = requests.get('https://export.arxiv.org/api/query', params={
+                   'search_query': QUERY, 'sortBy': 'submittedDate',
+                   'sortOrder': 'descending', 'max_results': '60'}, timeout=60)
+              if resp.status_code == 429 and attempt < 5:
+                  wait = 20 * (attempt + 1)
+                  print(f'arXiv 限流中，等待 {wait} 秒后重试（第 {attempt + 1}/5 次）...')
+                  time.sleep(wait)
+                  continue
+              resp.raise_for_status()
+              break
+
 
           ns = {'a': 'http://www.w3.org/2005/Atom'}
           root = ET.fromstring(resp.content)
@@ -79,6 +87,7 @@ jobs:
                   '问题要指向方法细节、数据可靠性、系统误差或可能的改进方向，'
                   '让学生带着问题去精读原文，不要泛泛而谈。\n\n'
                   '标题：' + title + '\n摘要：' + abstract)
+                  
               r = requests.post('https://open.bigmodel.cn/api/paas/v4/chat/completions',
                   headers={'Authorization': 'Bearer ' + LLM_API_KEY},
                   json={'model': 'glm-4-flash',
