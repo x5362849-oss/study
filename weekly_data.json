@@ -38,5 +38,25 @@
     "brief": "液体闪烁体中SiPM阵列的电荷粒子拓扑重建"
    }
   ]
+ },
+ {
+  "date": "2026-10-01",
+  "papers": [
+   {
+    "title": "X-ray polarization of the Compton-thin Seyfert galaxy NGC 5506 with IXPE",
+    "score": 8,
+    "brief": "IXPE观测NGC 5506的X射线偏振"
+   },
+   {
+    "title": "Prompting Particle Physics: Tokenized Multi-modal Foundation Models for Combinatorially Many Tasks",
+    "score": 7,
+    "brief": "多模态模型在粒子物理实验中的应用"
+   },
+   {
+    "title": "Characterization of immersed SiPM arrays in liquid scintillator between room temperature and $-30\\,^{\\circ}\\mathrm{C}$",
+    "score": 7,
+    "brief": "浸没SiPM在液态闪烁体中的特性"
+   }
+  ]
  }
 ]
