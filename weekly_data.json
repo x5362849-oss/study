@@ -18,5 +18,25 @@
     "brief": "优化ATLAS Tile Calorimeter设计以适应高亮度LHC。"
    }
   ]
+ },
+ {
+  "date": "2026-10-01",
+  "papers": [
+   {
+    "title": "Point-cloud generative models for fast calorimeter simulation across particles and geometries",
+    "score": 8,
+    "brief": "快速模拟高能物理实验的生成模型"
+   },
+   {
+    "title": "IXPE observation of the new magnetar source EP J223759.5+531421",
+    "score": 8,
+    "brief": "IXPE观测新磁星源EP J223759.5+531421的偏振"
+   },
+   {
+    "title": "Charged-particle topology reconstruction with an in-liquid SiPM array",
+    "score": 8,
+    "brief": "液体闪烁体中SiPM阵列的电荷粒子拓扑重建"
+   }
+  ]
  }
 ]
