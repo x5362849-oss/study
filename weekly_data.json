@@ -1,0 +1,22 @@
+[
+ {
+  "date": "2026-10-01",
+  "papers": [
+   {
+    "title": "XRISM Resolve Spectroscopy of GX 5-1: Constraints on Iron Spectral Features in a Luminous Neutron-Star Binary",
+    "score": 7,
+    "brief": "研究GX 5-1的X射线光谱，探讨铁谱特征。"
+   },
+   {
+    "title": "Global Spline Fit: A unified data-driven view of the cosmic-ray spectrum and mass composition from GeV to the highest energies",
+    "score": 6,
+    "brief": "构建宇宙射线谱和成分的统一数据驱动模型。"
+   },
+   {
+    "title": "Irradiation Studies and Design Optimization of the ATLAS Tile Calorimeter for the High-Luminosity LHC",
+    "score": 4,
+    "brief": "优化ATLAS Tile Calorimeter设计以适应高亮度LHC。"
+   }
+  ]
+ }
+]
