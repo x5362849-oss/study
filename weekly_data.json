@@ -58,5 +58,25 @@
     "brief": "浸没SiPM在液态闪烁体中的特性"
    }
   ]
+ },
+ {
+  "date": "2026-10-02",
+  "papers": [
+   {
+    "title": "Transition Radiation Detector Upgrade for the GlueX-III Charmonium Program",
+    "score": 8,
+    "brief": "升级GlueX-III的Transition Radiation Detector"
+   },
+   {
+    "title": "Measuring short-range correlations using relativistic heavy-ion collisions",
+    "score": 7,
+    "brief": "利用重离子碰撞测量短程相关"
+   },
+   {
+    "title": "Bayesian Optimization of The Relativistic Heavy Ion Collider Luminosity via $s^*$ Control",
+    "score": 7,
+    "brief": "通过s^*控制优化RHIC亮度"
+   }
+  ]
  }
 ]
