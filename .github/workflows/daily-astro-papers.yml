@@ -2,8 +2,10 @@ name: Daily Astro Papers
 
 on:
   schedule:
-    - cron: '23 21 * * *'   # UTC 0点 = 北京时间早上 8:00 自动运行
+    - cron: '23 21 * * *'   # 每天自动运行（实际推送时间为北京时间早上 5:23 左右）
   workflow_dispatch:
+permissions:
+  contents: write
 
 jobs:
   daily-paper:
@@ -15,14 +17,21 @@ jobs:
           SENDKEY: ${{ secrets.SENDKEY }}
         run: |
           python3 << 'PYEOF'
-          import os, re, datetime
+          import os, re, json, time, datetime
           import requests
-          import time
           import xml.etree.ElementTree as ET
+
+          SEEN_FILE = "seen_ids.json"       # 功能①去重记录（会存回仓库）
+          WEEKLY_FILE = "weekly_data.json"  # 功能③周报数据（会存回仓库）
+          TOP_N = 3                         # 方案一：每天推送 3 篇，想改数量只动这里
+
+          TZ_BJ = datetime.timezone(datetime.timedelta(hours=8))
+          now_bj = datetime.datetime.now(TZ_BJ)
+          today = now_bj.strftime('%Y-%m-%d')
 
           LLM_API_KEY = os.environ.get('LLM_API_KEY', '')
           SENDKEY = os.environ.get('SENDKEY', '')
-          if not  LLM_API_KEY or not SENDKEY:
+          if not LLM_API_KEY or not SENDKEY:
               raise SystemExit('缺少 secrets：请检查文件里两个 secret 名字是否与仓库 Settings 中的名字一致')
 
           # ====== 想追踪的关键词，直接在下面增删即可 ======
@@ -36,6 +45,43 @@ jobs:
                    'OR all:"X-ray polarimetry" OR all:"transition radiation detector" '
                    'OR all:"LHAASO" OR all:"SiPM" OR all:"calorimeter")')
 
+          # ============ 功能① 去重 ============
+          def paper_key(p):
+              """从论文链接提取 arXiv 编号并去掉版本号：.../abs/2401.12345v2 → 2401.12345"""
+              return re.sub(r'v\d+$', '', p['link'].split('/abs/')[-1])
+
+          def load_json_list(path):
+              if os.path.exists(path):
+                  try:
+                      with open(path, 'r', encoding='utf-8') as f:
+                          data = json.load(f)
+                      return data if isinstance(data, list) else []
+                  except (json.JSONDecodeError, OSError):
+                      return []
+              return []
+
+          def load_seen_ids():
+              return set(load_json_list(SEEN_FILE))
+
+          def save_seen_ids(seen_ids):
+              with open(SEEN_FILE, 'w', encoding='utf-8') as f:
+                  json.dump(sorted(seen_ids)[-500:], f)  # 只留最近500条，防止无限膨胀
+
+          # ============ 功能③ 周报数据 ============
+          def save_daily_record(pushed):
+              """当天推送的论文追加进周报数据文件，自动清理9天前的旧记录"""
+              if not pushed:
+                  return
+              records = load_json_list(WEEKLY_FILE)
+              cutoff = (now_bj - datetime.timedelta(days=9)).strftime('%Y-%m-%d')
+              records = [r for r in records if r.get('date', '') >= cutoff]
+              records.append({'date': today, 'papers': [
+                  {'title': p['title'], 'score': p.get('score'), 'brief': p.get('brief', '')}
+                  for p in pushed]})
+              with open(WEEKLY_FILE, 'w', encoding='utf-8') as f:
+                  json.dump(records, f, ensure_ascii=False, indent=1)
+
+          # ============ 拉取 arXiv ============
           for attempt in range(6):
               resp = requests.get('https://export.arxiv.org/api/query', params={
                    'search_query': QUERY, 'sortBy': 'submittedDate',
@@ -48,10 +94,9 @@ jobs:
               resp.raise_for_status()
               break
 
-
           ns = {'a': 'http://www.w3.org/2005/Atom'}
           root = ET.fromstring(resp.content)
-          cutoff = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=5)
+          cutoff = now_bj - datetime.timedelta(days=5)
           recent, older = [], []
           for e in root.findall('a:entry', ns):
               title = re.sub(r'\s+', ' ', e.findtext('a:title', '', ns)).strip()
@@ -64,17 +109,29 @@ jobs:
               paper = {'title': title, 'abstract': abstract, 'link': link, 'pub': pub, 'authors': authors}
               (recent if pub >= cutoff else older).append(paper)
 
-          today = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d')
+          # ---- 功能①：过滤掉已经推送过的论文 ----
+          seen = load_seen_ids()
+          recent = [p for p in recent if paper_key(p) not in seen]
+          older = [p for p in older if paper_key(p) not in seen]
+          print('关键词筛选并去重后：近5天 %d 篇 / 更早 %d 篇' % (len(recent), len(older)))
+
           if recent:
-              papers, note = recent[:5], ''
+              candidates, note = recent, ''
           elif older:
-              papers, note = older[:2], '（近5天无完全匹配的新论文，以下是最近的相关论文回顾）'
+              candidates, note = older, '（近5天无完全匹配的新论文，以下是最近的相关论文回顾）'
           else:
-              papers, note = [], ''
-          print('筛选出 %d 篇论文' % len(papers))
+              candidates, note = [], ''
 
           SYSTEM_PROMPT = ('你是一位天体物理探测器方向的资深导师，负责帮学生预读文献。'
                            '回答只基于给定的标题和摘要，不要编造摘要中不存在的实验细节或数字。')
+
+          def chat(messages, temperature=0.4):
+              r = requests.post('https://open.bigmodel.cn/api/paas/v4/chat/completions',
+                  headers={'Authorization': 'Bearer ' + LLM_API_KEY},
+                  json={'model': 'glm-4-flash', 'messages': messages,
+                        'temperature': temperature}, timeout=180)
+              r.raise_for_status()
+              return r.json()['choices'][0]['message']['content']
 
           def ask_llm(title, abstract):
               user_prompt = (
@@ -87,23 +144,59 @@ jobs:
                   '问题要指向方法细节、数据可靠性、系统误差或可能的改进方向，'
                   '让学生带着问题去精读原文，不要泛泛而谈。\n\n'
                   '标题：' + title + '\n摘要：' + abstract)
-                  
-              r = requests.post('https://open.bigmodel.cn/api/paas/v4/chat/completions',
-                  headers={'Authorization': 'Bearer ' + LLM_API_KEY},
-                  json={'model': 'glm-4-flash',
-                        'messages': [{'role': 'system', 'content': SYSTEM_PROMPT},
-                                     {'role': 'user', 'content': user_prompt}],
-                        'temperature': 0.4}, timeout=180)
-              r.raise_for_status()
-              return r.json()['choices'][0]['message']['content']
+              return chat([{'role': 'system', 'content': SYSTEM_PROMPT},
+                           {'role': 'user', 'content': user_prompt}])
 
+          # ============ 功能② 相关性打分 ============
+          RESEARCH_DIRECTION = ('X射线/伽马射线天体物理探测器与仪器：X射线偏振测量、气体像素探测器、'
+                                'SiPM/硅光电倍增管、量能器，以及 HERD、Polar-2、eXTP、LHAASO、LACT 等项目')
+
+          def score_papers(cands):
+              """AI 批量打分，返回 {序号: (分数, 一句话简介)}；解析失败返回空字典，脚本退回按时间顺序选篇"""
+              listing = ''
+              for i, p in enumerate(cands, 1):
+                  listing += '编号%d：%s\n摘要：%s\n\n' % (i, p['title'], p['abstract'])
+              user_prompt = (
+                  '我的研究方向：' + RESEARCH_DIRECTION + '\n\n'
+                  '下面是 %d 篇论文，请给每篇打一个 0-10 的相关分\n'
+                  '（10=直接命中核心方向，7-9=高度相关，4-6=边缘相关，0-3=无关），\n'
+                  '并用不超过30字概括它做了什么。\n'
+                  '严格只输出 JSON 数组：[{"id":1,"score":8,"brief":"一句话"}]，不要输出其他内容。\n\n'
+                  % len(cands)) + listing
+              try:
+                  content = chat([{'role': 'user', 'content': user_prompt}], temperature=0.2)
+                  m = re.search(r'\[.*\]', content, re.S)
+                  result = {}
+                  for item in json.loads(m.group(0)):
+                      result[int(item['id'])] = (int(item['score']), str(item.get('brief', '')))
+                  return result
+              except Exception as err:
+                  print('打分失败（不影响推送，将按时间顺序选篇）:', err)
+                  return {}
+
+          # ---- 功能②：打分、排序、选前 TOP_N 篇 ----
+          if candidates:
+              scores = score_papers(candidates)
+              for i, p in enumerate(candidates, 1):
+                  s = scores.get(i)
+                  p['score'], p['brief'] = s if s else (None, '')
+              # 分数高的排前面；没打上分的排后面、保持原有时间顺序
+              candidates.sort(key=lambda p: (p['score'] is None, -(p['score'] or 0)))
+              papers = candidates[:TOP_N]
+          else:
+              papers = []
+          print('最终选出 %d 篇' % len(papers))
+
+          # ============ 组装并推送日报 ============
           if papers:
               desp = '# 🛰️ 天体物理文献日报 ' + today + '\n\n共 ' + str(len(papers)) + ' 篇 ' + note + '\n'
               for i, p in enumerate(papers, 1):
                   print('总结中:', p['title'][:60])
                   author_str = ', '.join(p['authors'][:5]) + (' 等' if len(p['authors']) > 5 else '')
+                  score_txt = ('相关分 %d/10' % p['score']) if p['score'] is not None else '未打分'
                   desp += '\n---\n\n## ' + str(i) + '. ' + p['title'] + '\n\n'
-                  desp += '发表：' + p['pub'].strftime('%Y-%m-%d') + '　|　[arXiv 原文](' + p['link'] + ')\n\n'
+                  desp += ('发表：' + p['pub'].strftime('%Y-%m-%d') + '　|　' + score_txt
+                           + '　|　[arXiv 原文](' + p['link'] + ')\n\n')
                   desp += '作者：' + author_str + '\n\n'
                   try:
                       desp += ask_llm(p['title'], p['abstract']) + '\n'
@@ -112,7 +205,7 @@ jobs:
                   desp += '\n'
               push_title = '🔭 文献日报：' + str(len(papers)) + ' 篇新论文 ' + today
           else:
-              desp = '# 🛰️ 天体物理文献日报 ' + today + '\n\n近5天没有发现与你关键词相关的新论文，明天再看看。'
+              desp = '# 🛰️ 天体物理文献日报 ' + today + '\n\n近5天没有发现与你关键词相关的新论文（或都已推送过），明天再看看。'
               push_title = '🔭 文献日报：今日无新论文 ' + today
 
           print('正在推送到 Server酱...')
@@ -120,6 +213,41 @@ jobs:
                                data={'title': push_title, 'desp': desp}, timeout=60)
           resp.raise_for_status()
           print('推送成功')
-          PYEOF
 
-    
+          # ---- 推送成功后才记录：保证失败时明天还能重推这几篇 ----
+          if papers:
+              save_seen_ids(seen | {paper_key(p) for p in papers})
+              save_daily_record(papers)
+              print('已记录推送，用于去重与周报')
+
+          # ---- 功能③：周日（北京时间）加推一份周报 ----
+          if now_bj.weekday() == 6:
+              records = [r for r in load_json_list(WEEKLY_FILE)
+                         if r.get('date', '') >= (now_bj - datetime.timedelta(days=7)).strftime('%Y-%m-%d')]
+              if records:
+                  weekly_prompt = ('以下是我过去一周每天推送的论文记录（JSON，含相关分和一句话简介）：\n'
+                                   + json.dumps(records, ensure_ascii=False)
+                                   + '\n\n请用中文生成一份本周科研动态周报，包含：\n'
+                                     '1. 本周最热的 3 个研究方向（结合具体论文说明）\n'
+                                     '2. 出现频率最高的方法/技术词\n'
+                                     '3. 值得精读回看的 2-3 篇论文及理由\n'
+                                     '4. 给研究者的一段话：下周值得关注的趋势')
+                  try:
+                      report = chat([{'role': 'system', 'content': SYSTEM_PROMPT},
+                                     {'role': 'user', 'content': weekly_prompt}])
+                      requests.post('https://sctapi.ftqq.com/' + SENDKEY + '.send',
+                                    data={'title': '🔭 本周文献周报 ' + today, 'desp': report},
+                                    timeout=60).raise_for_status()
+                      print('周报已推送')
+                  except Exception as err:
+                      print('周报生成/推送失败（不影响当天日报）:', err)
+              else:
+                  print('近7天没有推送记录，跳过周报')
+
+          PYEOF
+      - name: Commit dedup record
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add seen_ids.json weekly_data.json 2>/dev/null || true
+          git diff --cached --quiet || (git commit -m "chore: 更新推送记录" && git push)
