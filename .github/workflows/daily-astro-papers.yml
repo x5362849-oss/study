@@ -11,6 +11,9 @@ jobs:
   daily-paper:
     runs-on: ubuntu-latest
     steps:
+      - name: 检出仓库（供最后的 Commit 步骤使用）
+        uses: actions/checkout@v4
+
       - name: 拉取arXiv新论文并总结推送
         env:
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
