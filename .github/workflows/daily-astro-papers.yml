@@ -224,7 +224,7 @@ jobs:
               print('已记录推送，用于去重与周报')
 
           # ---- 功能③：周日（北京时间）加推一份周报 ----
-          if now_bj.weekday() == 6:
+          if now_bj.weekday() == 3:
               records = [r for r in load_json_list(WEEKLY_FILE)
                          if r.get('date', '') >= (now_bj - datetime.timedelta(days=7)).strftime('%Y-%m-%d')]
               if records:
