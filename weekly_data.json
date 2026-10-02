@@ -98,5 +98,25 @@
     "brief": "评估SiPM在太空任务中的辐射硬度。"
    }
   ]
+ },
+ {
+  "date": "2026-10-03",
+  "papers": [
+   {
+    "title": "Proof-of-Concept and User Perspective on Photon-to-Digital Converter Applications in Particle Physics",
+    "score": 8,
+    "brief": "评估光子到数字转换器在粒子物理中的应用"
+   },
+   {
+    "title": "Cross-geometry transfer and model collapse in point cloud calorimeter shower generation",
+    "score": 7,
+    "brief": "研究点云量能器模拟中的跨几何迁移学习"
+   },
+   {
+    "title": "Jevons' Paradox and Fast Generative Simulation for HEP: Why Realistic Benchmarking is Essential",
+    "score": 7,
+    "brief": "探讨HEP中快速生成模拟的重要性"
+   }
+  ]
  }
 ]
