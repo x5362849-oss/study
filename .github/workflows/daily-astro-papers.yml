@@ -88,7 +88,7 @@ jobs:
           for attempt in range(6):
               resp = requests.get('https://export.arxiv.org/api/query', params={
                    'search_query': QUERY, 'sortBy': 'submittedDate',
-                   'sortOrder': 'descending', 'max_results': '60'}, timeout=60)
+                   'sortOrder': 'descending', 'max_results': '150'}, timeout=60)
               if resp.status_code == 429 and attempt < 5:
                   wait = 20 * (attempt + 1)
                   print(f'arXiv 限流中，等待 {wait} 秒后重试（第 {attempt + 1}/5 次）...')
@@ -99,7 +99,7 @@ jobs:
 
           ns = {'a': 'http://www.w3.org/2005/Atom'}
           root = ET.fromstring(resp.content)
-          cutoff = now_bj - datetime.timedelta(days=5)
+          cutoff = now_bj - datetime.timedelta(days=15)
           recent, older = [], []
           for e in root.findall('a:entry', ns):
               title = re.sub(r'\s+', ' ', e.findtext('a:title', '', ns)).strip()
@@ -116,12 +116,12 @@ jobs:
           seen = load_seen_ids()
           recent = [p for p in recent if paper_key(p) not in seen]
           older = [p for p in older if paper_key(p) not in seen]
-          print('关键词筛选并去重后：近5天 %d 篇 / 更早 %d 篇' % (len(recent), len(older)))
+          print('关键词筛选并去重后：近15天 %d 篇 / 更早 %d 篇' % (len(recent), len(older)))
 
           if recent:
               candidates, note = recent, ''
           elif older:
-              candidates, note = older, '（近5天无完全匹配的新论文，以下是最近的相关论文回顾）'
+              candidates, note = older, '（近15天无完全匹配的新论文，以下是最近的相关论文回顾）'
           else:
               candidates, note = [], ''
 
@@ -208,7 +208,7 @@ jobs:
                   desp += '\n'
               push_title = '🔭 文献日报：' + str(len(papers)) + ' 篇新论文 ' + today
           else:
-              desp = '# 🛰️ 天体物理文献日报 ' + today + '\n\n近5天没有发现与你关键词相关的新论文（或都已推送过），明天再看看。'
+              desp = '# 🛰️ 天体物理文献日报 ' + today + '\n\n近15天没有发现与你关键词相关的新论文（或都已推送过），明天再看看。'
               push_title = '🔭 文献日报：今日无新论文 ' + today
 
           print('正在推送到 Server酱...')
