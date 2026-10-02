@@ -78,5 +78,25 @@
     "brief": "通过s^*控制优化RHIC亮度"
    }
   ]
+ },
+ {
+  "date": "2026-10-02",
+  "papers": [
+   {
+    "title": "A method for enhanced gamma-proton discrimination with imaging atmospheric Cherenkov telescopes",
+    "score": 8,
+    "brief": "提出一种增强大气 Cherenkov 望远镜伽马-质子区分的方法。"
+   },
+   {
+    "title": "A-GHOST: High-rate streaming of trigger-level data to programmable GPU inference",
+    "score": 7,
+    "brief": "研究高能物理实验的高速率数据读取架构，涉及GPU加速处理。"
+   },
+   {
+    "title": "Radiation hardness characterization of SiPM sensors for Low Earth Orbit space missions",
+    "score": 7,
+    "brief": "评估SiPM在太空任务中的辐射硬度。"
+   }
+  ]
  }
 ]
