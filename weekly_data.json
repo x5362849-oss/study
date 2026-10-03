@@ -118,5 +118,15 @@
     "brief": "探讨HEP中快速生成模拟的重要性"
    }
   ]
+ },
+ {
+  "date": "2026-10-04",
+  "papers": [
+   {
+    "title": "A Coherent Memory Register for Sequential Quantum Generative Modeling, with Application to Calorimeter Showers",
+    "score": 3,
+    "brief": "使用量子电路模拟粒子在量能器中的沉积"
+   }
+  ]
  }
 ]
